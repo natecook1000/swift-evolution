@@ -219,6 +219,8 @@ final class CollectionExtensionsTests: XCTestCase {
                 XCTAssertEqual(
                     chosenElements[chosenIdx..<chosenUpper],
                     discontiguousSlice[disIdx..<disUpper])
+                XCTAssert(chosenElements[chosenIdx..<chosenUpper]
+                    .elementsEqual(discontiguousSlice[disIdx..<disUpper]))
             }
         }
     }

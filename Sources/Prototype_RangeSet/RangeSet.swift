@@ -9,7 +9,9 @@ public struct RangeSet<Bound: Comparable> {
     ///
     /// - Parameter range: The range to use for the new range set.
     public init(_ range: Range<Bound>) {
-        self._ranges = [range]
+        if !range.isEmpty {
+            self._ranges = [range]
+        }
     }
     
     /// Creates a range set containing the given ranges.
