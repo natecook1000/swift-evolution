@@ -1,11 +1,11 @@
-/// A set of ranges of any comparable value.
+/// A set of values of any comparable value, represented by ranges.
 public struct RangeSet<Bound: Comparable> {
     internal var _ranges: [Range<Bound>] = []
 
     /// Creates an empty range set.
     public init() {}
 
-    /// Creates a range set containing the given range.
+    /// Creates a range set containing the values in the given range.
     ///
     /// - Parameter range: The range to use for the new range set.
     public init(_ range: Range<Bound>) {
@@ -14,12 +14,19 @@ public struct RangeSet<Bound: Comparable> {
         }
     }
     
-    /// Creates a range set containing the given ranges.
+    /// Creates a range set containing the values in the given ranges.
     ///
-    /// - Parameter ranges: The ranges to use for the new range set.
+    /// Any ranges that overlap or adjoin are merged together in the range set.
+    /// Empty ranges are ignored. For example:
+    ///
+    ///     let allowedValues = RangeSet(0.0..<0.0, 0.25..<0.5, 0.5..<1.0, 2.0..<5.0, 4.0..<6.0)
+    ///     // allowedValues == RangeSet(0.25..<1.0, 2.0..<6.0)
+    ///
+    /// - Parameter ranges: The ranges of values to include in the new range
+    ///   set.
     public init<S: Sequence>(_ ranges: S) where S.Element == Range<Bound> {
         for range in ranges {
-            insert(range)
+            insert(contentsOf: range)
         }
     }
     
@@ -65,22 +72,6 @@ public struct RangeSet<Bound: Comparable> {
         return i == _ranges.endIndex
             ? false
             : _ranges[i].lowerBound <= value
-    }
-    
-    /// Returns a Boolean value indicating whether the given range is
-    /// contained in the range set.
-    ///
-    /// - Parameter range: The range to look for in the range set.
-    /// - Return: `true` if `element` is contained in the range set; otherwise,
-    ///   `false`.
-    ///
-    /// - Complexity: O(log *n*), where *n* is the number of ranges in the
-    ///   range set.
-    public func contains(_ range: Range<Bound>) -> Bool {
-        let i = _ranges._partitioningIndex { $0.upperBound >= range.upperBound }
-        return i == _ranges.endIndex
-            ? false
-            : _ranges[i].lowerBound <= range.lowerBound
     }
     
     /// Returns a range indicating the existing ranges that `range` overlaps
@@ -133,13 +124,22 @@ public struct RangeSet<Bound: Comparable> {
         }
     }
     
-    /// Inserts the given range into the range set.
+    /// Adds the values represented by the given range to the range set.
     ///
-    /// - Parameter range: The range to insert into the set.
+    /// If `range` overlaps or adjoins any existing ranges in the set, the
+    /// ranges are merged together. Empty ranges are ignored.
+    ///
+    ///     var set = RangeSet(0.0..<0.5, 1.0..<1.5)
+    ///     set.insert(contentsOf: 0.25..<0.75)
+    ///     // set == (0.0..<0.75, 1.0..<1.5)
+    ///     set.insert(contentsOf: 2.0..<2.0)
+    ///     // set == (0.0..<0.75, 1.0..<1.5)
+    ///
+    /// - Parameter range: The range to add to the set.
     ///
     /// - Complexity: O(*n*), where *n* is the number of ranges in the range
     ///   set.
-    public mutating func insert(_ range: Range<Bound>) {
+    public mutating func insert(contentsOf range: Range<Bound>) {
         // Shortcuts for the (literal) edge cases
         if range.isEmpty { return }
         guard !_ranges.isEmpty else {
@@ -175,13 +175,26 @@ public struct RangeSet<Bound: Comparable> {
             with: CollectionOfOne(newLowerBound..<newUpperBound))
     }
     
-    /// Removes the given range from the range set.
+    /// Removes the given range of values from the range set.
+    ///
+    /// The values represented by `range` are removed from this set. This may
+    /// result in one or more ranges being truncated or removed, depending on
+    /// the overlap between `range` and the set's existing ranges.
+    ///
+    ///     var set = RangeSet(0.0..<0.5, 1.0..<1.5)
+    ///     set.remove(contentsOf: 0.25..<1.25)
+    ///     // set == (0.0..<0.25, 1.25..<1.5)
+    ///
+    /// Passing an empty range as `range` has no effect.
+    ///
+    ///     set.remove(contentsOf: 0.125..<0.125)
+    ///     // set == (0.0..<0.25, 1.25..<1.5)
     ///
     /// - Parameter range: The range to remove from the set.
     ///
     /// - Complexity: O(*n*), where *n* is the number of ranges in the range
     ///   set.
-    public mutating func remove(_ range: Range<Bound>) {
+    public mutating func remove(contentsOf range: Range<Bound>) {
         // Shortcuts for the (literal) edge cases
         if range.isEmpty
             || _ranges.isEmpty
@@ -223,15 +236,10 @@ extension RangeSet: Equatable {}
 
 extension RangeSet: Hashable where Bound: Hashable {}
 
-extension RangeSet: ExpressibleByArrayLiteral {
-    public init(arrayLiteral elements: Range<Bound>...) {
-        self.init(elements)
-    }
-}
-
 // MARK: - Range Collection
 
 extension RangeSet {
+    /// The ranges that make up a `RangeSet`.
     public struct Ranges: RandomAccessCollection {
         var _ranges: [Range<Bound>]
     
@@ -249,148 +257,24 @@ extension RangeSet {
     }
 }
 
-// MARK: - Collection APIs
+// MARK: - Gaps
 
 extension RangeSet {
-    /// Creates a new range set containing a range that contains only the
-    /// specified index in the given collection.
-    ///
-    /// - Parameters:
-    ///   - index: The index to include in the range set. `index` must be a
-    ///     valid index of `collection` that isn't the collection's `endIndex`.
-    ///   - collection: The collection that contains `index`.
-    public init<C>(_ index: Bound, within collection: C)
-        where C: Collection, C.Index == Bound
-    {
-        let range = index..<collection.index(after: index)
-        self.init(range)
-    }
-    
-    /// Creates a new range set containing ranges that contain only the
-    /// specified indices in the given collection.
-    ///
-    /// - Parameters:
-    ///   - index: The index to include in the range set. `index` must be a
-    ///     valid index of `collection` that isn't the collection's `endIndex`.
-    ///   - collection: The collection that contains `index`.
-    public init<S, C>(_ indices: S, within collection: C)
-        where S: Sequence, C: Collection, S.Element == C.Index, C.Index == Bound
-    {
-        for i in indices {
-            self.insert(i, within: collection)
-        }
-    }
-    
-    /// Creates a new range set containing the range represented by the
-    /// specified range expression.
-    ///
-    /// - Parameters:
-    ///   - range: The range expression to use as the set's initial range.
-    ///   - collection: The collection that `range` is relative to.
-    public init<R, C>(_ range: R, within collection: C)
-        where C: Collection, C.Index == Bound, R: RangeExpression, R.Bound == Bound
-    {
-        let concreteRange = range.relative(to: collection)
-        self.init(concreteRange)
-    }
-    
-    /// Inserts a range that contains only the specified index into the range
-    /// set.
-    ///
-    /// - Parameters:
-    ///   - index: The index to insert into the range set. `index` must be a
-    ///     valid index of `collection` that isn't the collection's `endIndex`.
-    ///   - collection: The collection that contains `index`.
-    ///
-    /// - Complexity: O(*n*), where *n* is the number of ranges in the range
-    ///   set.
-    public mutating func insert<C>(_ index: Bound, within collection: C)
-        where C: Collection, C.Index == Bound
-    {
-        insert(index ..< collection.index(after: index))
-    }
-    
-    /// Inserts the range represented by the specified range expression into
-    /// the range set.
-    ///
-    /// - Parameters:
-    ///   - range: The range expression to insert into the range set.
-    ///   - collection: The collection that `range` is relative to.
-    ///
-    /// - Complexity: O(*n*), where *n* is the number of ranges in the range
-    ///   set.
-    public mutating func insert<R, C>(_ range: R, within collection: C)
-        where C: Collection, C.Index == Bound, R: RangeExpression, R.Bound == Bound
-    {
-        let concreteRange = range.relative(to: collection)
-        insert(concreteRange)
-    }
-    
-    /// Removes the range that contains only the specified index from the range
-    /// set.
-    ///
-    /// - Parameters:
-    ///   - index: The index to remove from the range set. `index` must be a
-    ///     valid index of `collection` that isn't the collection's `endIndex`.
-    ///   - collection: The collection that contains `index`.
-    ///
-    /// - Complexity: O(*n*), where *n* is the number of ranges in the range
-    ///   set.
-    public mutating func remove<C>(_ index: Bound, within collection: C)
-        where C: Collection, C.Index == Bound
-    {
-        remove(index ..< collection.index(after: index))
-    }
-    
-    /// Removes the range represented by the specified range expression from
-    /// the range set.
-    ///
-    /// - Parameters:
-    ///   - range: The range expression to remove from the range set.
-    ///   - collection: The collection that `range` is relative to.
-    ///
-    /// - Complexity: O(*n*), where *n* is the number of ranges in the range
-    ///   set.
-    public mutating func remove<R, C>(_ range: R, within collection: C)
-        where C: Collection, C.Index == Bound, R: RangeExpression, R.Bound == Bound
-    {
-        let concreteRange = range.relative(to: collection)
-        remove(concreteRange)
-    }
-
-    /// Returns a range set that represents all the elements in the given
-    /// collection that aren't represented by this range set.
-    ///
-    /// The following example finds the indices of the vowels in a string, and
-    /// then inverts the range set to find the non-vowels parts of the string.
-    ///
-    ///     let str = "The rain in Spain stays mainly in the plain."
-    ///     let vowels = "aeiou"
-    ///     let vowelIndices = str.indices(where: { vowels.contains($0) })
-    ///     print(String(str[vowelIndices]))
-    ///     // Prints "eaiiaiaaiieai"
-    ///
-    ///     let nonVowelIndices = vowelIndices.inverted(within: str)
-    ///     print(String(str[nonVowelIndices]))
-    ///     // Prints "Th rn n Spn stys mnly n th pln."
-    ///
-    /// - Parameter collection: The collection that the range set is relative
-    ///   to.
-    /// - Returns: A new range set that represents the elements in `collection`
-    ///   that aren't represented by this range set.
-    ///
-    /// - Complexity: O(*n*), where *n* is the number of ranges in the range
-    ///   set.
-    public func inverted<C>(within collection: C) -> RangeSet
-        where C: Collection, C.Index == Bound
-    {
-        var result: RangeSet = []
-        var low = collection.startIndex
-        for range in _ranges {
-            result.insert(low..<range.lowerBound)
+    /// Returns a range set that represents the ranges of values within the
+    /// given bounds that aren't represented by this range set.
+    func _gaps(boundedBy bounds: Range<Bound>) -> RangeSet {
+        guard let start = _ranges.firstIndex(where: { $0.lowerBound >= bounds.lowerBound })
+            else { return RangeSet() }
+        guard let end = _ranges.lastIndex(where: { $0.upperBound <= bounds.upperBound })
+            else { return RangeSet() }
+        
+        var result = RangeSet()
+        var low = bounds.lowerBound
+        for range in _ranges[start...end] {
+            result.insert(contentsOf: low..<range.lowerBound)
             low = range.upperBound
         }
-        result.insert(low..<collection.endIndex)
+        result.insert(contentsOf: low..<bounds.upperBound)
         return result
     }
 }
@@ -398,11 +282,11 @@ extension RangeSet {
 // MARK: - SetAlgebra
 
 // These methods only depend on the ranges that comprise the range set, so
-// we can provide them even when we can't provide `SetAlgebra` conformance.
+// we can provide them even though we can't provide `SetAlgebra` conformance.
 extension RangeSet {
     public mutating func formUnion(_ other: __owned RangeSet<Bound>) {
         for range in other._ranges {
-            insert(range)
+            insert(contentsOf: range)
         }
     }
 
@@ -416,7 +300,7 @@ extension RangeSet {
     
     public mutating func subtract(_ other: RangeSet<Bound>) {
         for range in other._ranges {
-            remove(range)
+            remove(contentsOf: range)
         }
     }
 

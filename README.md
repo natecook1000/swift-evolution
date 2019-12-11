@@ -8,28 +8,28 @@ This library includes the `RangeSet` type and a variety of related collection op
 var numbers = Array(1...15)
 
 // Find the indices of all the even numbers
-let indicesOfEvens = numbers.indices(where: { $0.isMultiple(of: 2) })
+let indicesOfEvens = numbers.ranges(where: { $0.isMultiple(of: 2) })
 
 // Perform an operation with just the even numbers
 let sumOfEvens = numbers[indicesOfEvens].reduce(0, +)
 // sumOfEvens == 56
 
 // You can gather the even numbers at the beginning
-let rangeOfEvens = numbers.gather(indicesOfEvens, justBefore: numbers.startIndex)
+let rangeOfEvens = numbers.gather(indicesOfEvens, at: numbers.startIndex)
 // numbers == [2, 4, 6, 8, 10, 12, 14, 1, 3, 5, 7, 9, 11, 13, 15]
 // numbers[rangeOfEvens] == [2, 4, 6, 8, 10, 12, 14]
 
 // Reset `numbers`
 numbers = Array(1...15)
 
-// You can also build range sets by hand using array literals...
-let notTheMiddle: RangeSet = [0..<5, 10..<15]
+// You can also build range sets by hand...
+let notTheMiddle = RangeSet([0..<5, 10..<15])
 print(Array(numbers[notTheMiddle]))
 // Prints [1, 2, 3, 4, 5, 11, 12, 13, 14, 15]
 
 // ...or by using set operations
 let smallEvens = indicesOfEvens.intersection(
-    numbers.indices(where: { $0 < 10 }))
+    numbers.ranges(where: { $0 < 10 }))
 print(Array(numbers[smallEvens]))
 // Prints [2, 4, 6, 8]
 ```

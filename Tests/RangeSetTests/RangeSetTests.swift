@@ -1,9 +1,9 @@
 import XCTest
-import Prototype_RangeSet
+@testable import Prototype_RangeSet
 import TestHelpers
 
 let parent = -200..<200
-let source: RangeSet = [1..<5, 8..<10, 20..<22, 27..<29]
+let source = RangeSet([1..<5, 8..<10, 20..<22, 27..<29])
 
 func buildRandomRangeSet(iterations: Int = 100) -> RangeSet<Int> {
     var set = RangeSet<Int>()
@@ -11,9 +11,9 @@ func buildRandomRangeSet(iterations: Int = 100) -> RangeSet<Int> {
         var (a, b) = (Int.random(in: -100...100), Int.random(in: -100...100))
         if (a > b) { swap(&a, &b) }
         if Double.random(in: 0..<1) > 0.3 {
-            set.insert(a..<b)
+            set.insert(contentsOf: a..<b)
         } else {
-            set.remove(a..<b)
+            set.remove(contentsOf: a..<b)
         }
     }
     return set
@@ -34,81 +34,74 @@ final class RangeSetTests: XCTestCase {
                 XCTAssertTrue(set.contains(i))
             }
             
-            let inverted = set.inverted(within: parent)
+            let inverted = set._gaps(boundedBy: parent)
             for i in parent.indices[inverted] {
                 XCTAssertFalse(set.contains(i))
             }
         }
-        
-        XCTAssertTrue(source.contains(1..<5))
-        XCTAssertTrue(source.contains(1..<4))
-        XCTAssertTrue(source.contains(2..<5))
-        XCTAssertFalse(source.contains(2..<6))
-        XCTAssertFalse(source.contains(0..<5))
-        XCTAssertFalse(source.contains(2..<9))
     }
     
     func testInsertions() {
         do {
             // Overlap from middle to middle
             var s = source
-            s.insert(3..<21)
+            s.insert(contentsOf: 3..<21)
             XCTAssertEqual(s.ranges, [1..<22, 27..<29])
         }
 
         do {
             // insert in middle
             var s = source
-            s.insert(13..<15)
+            s.insert(contentsOf: 13..<15)
             XCTAssertEqual(s.ranges, [1..<5, 8..<10, 13..<15, 20..<22, 27..<29])
         }
 
         do {
             // extend a range
             var s = source
-            s.insert(22..<25)
+            s.insert(contentsOf: 22..<25)
             XCTAssertEqual(s.ranges, [1..<5, 8..<10, 20..<25, 27..<29])
         }
 
         do {
             // extend at beginning of range
             var s = source
-            s.insert(17..<20)
+            s.insert(contentsOf: 17..<20)
             XCTAssertEqual(s.ranges, [1..<5, 8..<10, 17..<22, 27..<29])
         }
 
         do {
             // insert at the beginning
             var s = source
-            s.insert(-10 ..< -5)
+            s.insert(contentsOf: -10 ..< -5)
             XCTAssertEqual(s.ranges, [-10 ..< -5, 1..<5, 8..<10, 20..<22, 27..<29])
         }
 
         do {
             // insert at the end
             var s = source
-            s.insert(35 ..< 40)
+            s.insert(contentsOf: 35 ..< 40)
             XCTAssertEqual(s.ranges, [1..<5, 8..<10, 20..<22, 27..<29, 35..<40])
         }
 
         do {
             // Overlap multiple ranges
             var s = source
-            s.insert(0..<21)
+            s.insert(contentsOf: 0..<21)
             XCTAssertEqual(s.ranges, [0..<22, 27..<29])
         }
 
         do {
             // Insert at end of range
             var s = source
-            s.insert(22, within: parent)
+            s.insert(contentsOf: parent.range(at: 22))
             XCTAssertEqual(s.ranges, [1..<5, 8..<10, 20..<23, 27..<29])
         }
 
         do {
             // Insert between ranges
             var s = source
-            s.insert(14, within: parent)
+            s.insert(contentsOf: parent.range(at: 14))
             XCTAssertEqual(s.ranges, [1..<5, 8..<10, 14..<15, 20..<22, 27..<29])
         }
     }
@@ -116,9 +109,9 @@ final class RangeSetTests: XCTestCase {
     func testRemovals() {
         do {
             var s = source
-            s.remove(4..<28)
+            s.remove(contentsOf: 4..<28)
             XCTAssertEqual(s.ranges, [1..<4, 28..<29])
-            s.remove(3, within: parent)
+            s.remove(contentsOf: parent.range(at: 3))
             XCTAssertEqual(s.ranges, [1..<3, 28..<29])
         }
     }
@@ -136,27 +129,40 @@ final class RangeSetTests: XCTestCase {
         }
     }
     
+    func testGaps() {
+        let firstSet = RangeSet([0.0..<0.25, 0.5..<0.75, 1.0..<2.0])        
+        do {
+            let secondSet = firstSet._gaps(boundedBy: 0.0..<5.0)
+            XCTAssertEqual(secondSet, RangeSet([0.25..<0.5, 0.75..<1.0, 2.0..<5.0]))
+            let sameAsFirstSet = secondSet._gaps(boundedBy: 0.0..<5.0)
+            XCTAssertEqual(sameAsFirstSet, firstSet)
+        }
+        
+        XCTAssert(firstSet._gaps(boundedBy: 5.0..<10.0).isEmpty)
+        XCTAssert(firstSet._gaps(boundedBy: 0.0..<0.0).isEmpty)
+    }
+    
     func testIntersection() {
         func intersectionViaSet(_ s1: RangeSet<Int>, _ s2: RangeSet<Int>) -> RangeSet<Int> {
             let set1 = Set(parent.indices[s1])
             let set2 = Set(parent.indices[s2])
-            return RangeSet(set1.intersection(set2), within: parent)
+            return RangeSet(set1.intersection(set2).map { parent.range(at: $0) })
         }
         
         do {
             // Simple test
-            let set1: RangeSet = [0..<5, 9..<14]
-            let set2: RangeSet = [1..<3, 4..<6, 8..<12]
-            let intersection: RangeSet = [1..<3, 4..<5, 9..<12]
+            let set1 = RangeSet([0..<5, 9..<14])
+            let set2 = RangeSet([1..<3, 4..<6, 8..<12])
+            let intersection = RangeSet([1..<3, 4..<5, 9..<12])
             XCTAssertEqual(set1.intersection(set2), intersection)
             XCTAssertEqual(set2.intersection(set1), intersection)
         }
         
         do {
             // Test with upper bound / lower bound equality
-            let set1: RangeSet = [10..<20, 30..<40]
-            let set2: RangeSet = [15..<30, 40..<50]
-            let intersection: RangeSet = [15..<20]
+            let set1 = RangeSet([10..<20, 30..<40])
+            let set2 = RangeSet([15..<30, 40..<50])
+            let intersection = RangeSet([15..<20])
             XCTAssertEqual(set1.intersection(set2), intersection)
             XCTAssertEqual(set2.intersection(set1), intersection)
         }
@@ -175,23 +181,23 @@ final class RangeSetTests: XCTestCase {
         func symmetricDifferenceViaSet(_ s1: RangeSet<Int>, _ s2: RangeSet<Int>) -> RangeSet<Int> {
             let set1 = Set(parent.indices[s1])
             let set2 = Set(parent.indices[s2])
-            return RangeSet(set1.symmetricDifference(set2), within: parent)
+            return RangeSet(set1.symmetricDifference(set2).map { parent.range(at: $0) })
         }
         
         do {
             // Simple test
-            let set1: RangeSet = [0..<5, 9..<14]
-            let set2: RangeSet = [1..<3, 4..<6, 8..<12]
-            let difference: RangeSet = [0..<1, 3..<4, 5..<6, 8..<9, 12..<14]
+            let set1 = RangeSet([0..<5, 9..<14])
+            let set2 = RangeSet([1..<3, 4..<6, 8..<12])
+            let difference = RangeSet([0..<1, 3..<4, 5..<6, 8..<9, 12..<14])
             XCTAssertEqual(set1.symmetricDifference(set2), difference)
             XCTAssertEqual(set2.symmetricDifference(set1), difference)
         }
         
         do {
             // Test with upper bound / lower bound equality
-            let set1: RangeSet = [10..<20, 30..<40]
-            let set2: RangeSet = [15..<30, 40..<50]
-            let difference: RangeSet = [10..<15, 20..<50]
+            let set1 = RangeSet([10..<20, 30..<40])
+            let set2 = RangeSet([15..<30, 40..<50])
+            let difference = RangeSet([10..<15, 20..<50])
             XCTAssertEqual(set1.symmetricDifference(set2), difference)
             XCTAssertEqual(set2.symmetricDifference(set1), difference)
         }

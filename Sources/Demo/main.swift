@@ -7,7 +7,7 @@ import Prototype_RangeSet
 var numbers = Array(1...15)
 
 // Find the indices of all the even numbers
-let indicesOfEvens = numbers.indices(where: { $0.isMultiple(of: 2) })
+let indicesOfEvens = numbers.ranges(where: { $0.isMultiple(of: 2) })
 
 // Perform an operation with just the even numbers
 let sumOfEvens = numbers[indicesOfEvens].reduce(0, +)
@@ -25,13 +25,13 @@ print(numbers[rangeOfEvens])
 numbers = Array(1...15)
 
 // You can also build range sets by hand using array literals...
-let notTheMiddle: RangeSet = [0..<5, 10..<15]
+let notTheMiddle = RangeSet([0..<5, 10..<15])
 print(Array(numbers[notTheMiddle]))
 // Prints [1, 2, 3, 4, 5, 11, 12, 13, 14, 15]
 
 // ...or by using set operations
 let smallEvens = indicesOfEvens.intersection(
-    numbers.indices(where: { $0 < 10 }))
+    numbers.ranges(where: { $0 < 10 }))
 print(Array(numbers[smallEvens]))
 // Prints [2, 4, 6, 8]
 
@@ -71,7 +71,7 @@ func resetStreets() { streets.sort() }
 //===----------------------------------------------------------------------===//
 
 // Find all elements matching a predicate
-let indicesEndingInSon = streets.indices(where: { $0.suffix(3) == "son" })
+let indicesEndingInSon = streets.ranges(where: { $0.suffix(3) == "son" })
 print(indicesEndingInSon)
 
 // Iterate over a RangeSet by providing the initial collection
@@ -84,7 +84,7 @@ let streetsEndingInSon = streets[indicesEndingInSon]
 print(streetsEndingInSon)
 print(Array(streetsEndingInSon))
 
-let streetsNotEndingInSon = streets[indicesEndingInSon.inverted(within: streets)]
+let streetsNotEndingInSon = streets.removingAll(at: indicesEndingInSon)
 print(Array(streetsNotEndingInSon))
 
 // Remove all elements in range set
@@ -93,7 +93,7 @@ streetsWithoutSon.removeAll(at: indicesEndingInSon)
 print(streetsWithoutSon)
 
 // Gather all elements in range set to new index
-let indicesOfShortStreets = streets.indices(where: { $0.count <= 7 })
+let indicesOfShortStreets = streets.ranges(where: { $0.count <= 7 })
 let rangeOfShortStreets = streets.gather(indicesOfShortStreets, at: 3)
 
 print(streets[..<rangeOfShortStreets.lowerBound])

@@ -12,6 +12,12 @@ extension Collection {
     public subscript(indices: RangeSet<Index>) -> DiscontiguousSlice<Self> {
         DiscontiguousSlice(base: self, ranges: indices)
     }
+    
+    /// Returns a range that contains the single given index with respect to
+    /// this collection.
+    public func range(at position: Index) -> Range<Index> {
+        position..<index(after: position)
+    }
 }
 
 extension MutableCollection {
@@ -37,103 +43,9 @@ extension MutableCollection {
     }
 }
 
-// MARK: - move(from:to:) / move(to:where:)
+// MARK: - gather(_:at:) / gather(at:where:)
 
 extension MutableCollection {
-    /// Shifts the elements in the given range to just before the element at
-    /// the specified index.
-    ///
-    /// - Parameters:
-    ///   - range: The range of the elements to move.
-    ///   - insertionPoint: The index to use as the insertion point for the
-    ///     elements. `insertionPoint` must be a valid index of the collection.
-    /// - Returns: The new bounds of the moved elements.
-    ///
-    /// - Complexity: O(*n*) where *n* is the length of the collection.
-    @discardableResult
-    public mutating func shift(
-        from range: Range<Index>, to insertionPoint: Index
-    ) -> Range<Index> {
-        if insertionPoint < range.lowerBound {
-            let endIndex = _rotate(
-                in: insertionPoint..<range.upperBound,
-                shiftingToStart: range.lowerBound)
-            return insertionPoint..<endIndex
-        }
-
-        if range.upperBound < insertionPoint {
-            let startIndex = _rotate(
-                in: range.lowerBound..<insertionPoint,
-                shiftingToStart: range.upperBound)
-            return startIndex..<insertionPoint
-        }
-
-        return range
-    }
-
-    /// Shifts the elements in the given range expression to just before the
-    /// element at the specified index.
-    ///
-    /// - Parameters:
-    ///   - range: The range of the elements to move.
-    ///   - insertionPoint: The index to use as the insertion point for the
-    ///     elements. `insertionPoint` must be a valid index of the collection.
-    /// - Returns: The new bounds of the moved elements.
-    ///
-    /// - Complexity: O(*n*) where *n* is the length of the collection.
-    @discardableResult
-    public mutating func shift<R : RangeExpression>(
-        from range: R, to insertionPoint: Index
-    ) -> Range<Index> where R.Bound == Index {
-        return shift(from: range.relative(to: self), to: insertionPoint)
-    }
-
-    /// Moves the element at the given index to just before the element at the
-    /// specified index.
-    ///
-    /// This method moves the element at position `i` to immediately before
-    /// `insertionPoint`. This example shows moving elements forward and
-    /// backward in an array of integers.
-    ///
-    ///     var numbers = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-    ///     let newIndexOfNine = numbers.shift(from: 9, toJustBefore: 7)
-    ///     // numbers == [0, 1, 2, 3, 4, 5, 6, 9, 7, 8, 10]
-    ///     // newIndexOfNine == 7
-    ///
-    ///     let newIndexOfOne = numbers.shift(from: 1, toJustBefore: 4)
-    ///     // numbers == [0, 2, 3, 1, 4, 5, 6, 9, 7, 8, 10]
-    ///     // newIndexOfOne == 3
-    ///
-    /// To move an element to the end of a collection, pass the collection's
-    /// `endIndex` as `insertionPoint`.
-    ///
-    ///     numbers.shift(from: 0, toJustBefore: numbers.endIndex)
-    ///     // numbers == [2, 3, 1, 4, 5, 6, 9, 7, 8, 10, 0]
-    ///
-    /// - Parameters:
-    ///   - source: The index of the element to move. `source` must be a valid
-    ///     index of the collection that isn't `endIndex`.
-    ///   - insertionPoint: The index to use as the destination of the element.
-    ///     `insertionPoint` must be a valid index of the collection.
-    /// - Returns: The resulting index of the element that began at `source`.
-    ///
-    /// - Complexity: O(*n*) where *n* is the length of the collection.
-    @discardableResult
-    public mutating func shift(
-        from source: Index, to insertionPoint: Index
-    ) -> Index {
-        _failEarlyRangeCheck(source, bounds: startIndex..<endIndex)
-        _failEarlyRangeCheck(insertionPoint, bounds: startIndex..<endIndex)
-        if source == insertionPoint {
-            return source
-        } else if source < insertionPoint {
-            return _rotate(in: source..<insertionPoint, shiftingToStart: index(after: source))
-        } else {
-            _rotate(in: insertionPoint..<index(after: source), shiftingToStart: source)
-            return insertionPoint
-        }
-    }
-
     /// Collects the elements at the given indices just before the element at
     /// the specified index.
     ///
@@ -141,8 +53,8 @@ extension MutableCollection {
     /// gathers them between `"i"` and `"j"`.
     ///
     ///     var letters = Array("ABCdeFGhijkLMNOp")
-    ///     let uppercase = letters.indices(where: { $0.isUppercase })
-    ///     let rangeOfUppercase = letters.gather(uppercase, justBefore: 10)
+    ///     let uppercase = letters.ranges(where: { $0.isUppercase })
+    ///     let rangeOfUppercase = letters.gather(uppercase, at: 10)
     ///     // String(letters) == "dehiABCFGLMNOjkp"
     ///     // rangeOfUppercase == 4..<13
     ///
@@ -176,7 +88,7 @@ extension MutableCollection {
     /// `"i"` and `"j"`.
     ///
     ///     var letters = Array("ABCdeFGhijkLMNOp")
-    ///     let rangeOfUppercase = letters.gather(justBefore: 10) { $0.isUppercase }
+    ///     let rangeOfUppercase = letters.gather(at: 10) { $0.isUppercase }
     ///     // String(letters) == "dehiABCFGLMNOjkp"
     ///     // rangeOfUppercase == 4..<13
     ///
@@ -215,7 +127,7 @@ extension RangeReplaceableCollection {
     ///
     ///     var str = "The rain in Spain stays mainly in the plain."
     ///     let vowels: Set<Character> = ["a", "e", "i", "o", "u"]
-    ///     let vowelIndices = str.indices(where: { vowels.contains($0) })
+    ///     let vowelIndices = str.ranges(where: { vowels.contains($0) })
     ///
     ///     str.removeAll(at: vowelIndices)
     ///     // str == "Th rn n Spn stys mnly n th pln."
@@ -228,7 +140,7 @@ extension RangeReplaceableCollection {
             return
         }
         
-        let inversion = indices.inverted(within: self)
+        let inversion = indices._gaps(boundedBy: startIndex..<endIndex)
         var result = Self()
         for range in inversion.ranges {
             result.append(contentsOf: self[range])
@@ -244,7 +156,7 @@ extension MutableCollection where Self: RangeReplaceableCollection {
     /// numbers in the array, and then removes those values.
     ///
     ///     var numbers = [5, 7, -3, -8, 11, 2, -1, 6]
-    ///     let negativeIndices = numbers.indices(where: { $0 < 0 })
+    ///     let negativeIndices = numbers.ranges(where: { $0 < 0 })
     ///
     ///     numbers.removeAll(at: negativeIndices)
     ///     // numbers == [5, 7, 11, 2, 6]
@@ -306,7 +218,7 @@ extension Collection {
     ///
     ///     let str = "The rain in Spain stays mainly in the plain."
     ///     let vowels: Set<Character> = ["a", "e", "i", "o", "u"]
-    ///     let vowelIndices = str.indices(where: { vowels.contains($0) })
+    ///     let vowelIndices = str.ranges(where: { vowels.contains($0) })
     ///
     ///     let disemvoweled = str.removingAll(at: vowelIndices)
     ///     print(String(disemvoweled))
@@ -317,12 +229,12 @@ extension Collection {
     ///
     /// - Complexity: O(*n*), where *n* is the length of the collection.
     public func removingAll(at indices: RangeSet<Index>) -> DiscontiguousSlice<Self> {
-        let inversion = indices.inverted(within: self)
+        let inversion = indices._gaps(boundedBy: startIndex..<endIndex)
         return self[inversion]
     }
 }
 
-// MARK: - indices(of:) / indices(where:)
+// MARK: - ranges(of:) / ranges(where:)
 
 extension Collection where Element: Equatable {
     /// Returns the indices of all the elements that are equal to the given
@@ -332,7 +244,7 @@ extension Collection where Element: Equatable {
     /// particular letter occurs in a string.
     ///
     ///     let str = "Fresh cheese in a breeze"
-    ///     let allTheEs = str.indices(of: "e")
+    ///     let allTheEs = str.ranges(of: "e")
     ///     // str[allTheEs].count == 7
     ///
     /// - Parameter element: An element to look for in the collection.
@@ -340,8 +252,8 @@ extension Collection where Element: Equatable {
     ///   `element`.
     ///
     /// - Complexity: O(*n*), where *n* is the length of the collection.
-    public func indices(of element: Element) -> RangeSet<Index> {
-        indices(where: { $0 == element })
+    public func ranges(of element: Element) -> RangeSet<Index> {
+        ranges(where: { $0 == element })
     }
 }
 
@@ -353,7 +265,7 @@ extension Collection {
     ///
     ///     let str = "Fresh cheese in a breeze"
     ///     let vowels: Set<Character> = ["a", "e", "i", "o", "u"]
-    ///     let allTheVowels = str.indices(where: { vowels.contains($0) })
+    ///     let allTheVowels = str.ranges(where: { vowels.contains($0) })
     ///     // str[allTheVowels].count == 9
     ///
     /// - Parameter predicate: A closure that takes an element as its argument
@@ -363,10 +275,10 @@ extension Collection {
     ///   returns `true`.
     ///
     /// - Complexity: O(*n*), where *n* is the length of the collection.
-    public func indices(where predicate: (Element) throws -> Bool) rethrows
+    public func ranges(where predicate: (Element) throws -> Bool) rethrows
         -> RangeSet<Index>
     {
-        if isEmpty { return [] }
+        if isEmpty { return RangeSet() }
         
         var result = RangeSet<Index>()
         var i = startIndex
