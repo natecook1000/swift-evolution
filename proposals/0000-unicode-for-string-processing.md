@@ -172,7 +172,7 @@ Note that the `ignoresCase()` is available on any type conforming to `RegexCompo
 let regex3 = /banana/.ignoresCase()
 ```
 
-Calling an option-setting method like `ignoresCase(_:)` acts like wrapping the callee in an option-setting group `(?:...)`. That is, while it sets the behavior for the callee, it doesn’t override options that are applied to more specific regions. In this example, the middle `"na"` in `"banana"` matches case-sensitively, despite the outer call to `ignoresCase()`:
+Calling an option-setting method like `ignoresCase()` acts like wrapping the callee in an option-setting group `(?:...)`. That is, while it sets the behavior for the callee, it doesn’t override options that are applied to more specific regions. In this example, the middle `"na"` in `"banana"` matches case-sensitively, despite the outer call to `ignoresCase()`:
 
 ```swift
 let regex4 = Regex {
@@ -216,16 +216,16 @@ Regexes perform case sensitive comparisons by default. The `i` option or the `ig
 ```swift
 let str = "Café"
 	
-str.firstMatch(of: /CAFÉ/)          // nil
-str.firstMatch(of: /(?i)CAFÉ/)      // "Café"
-str.firstMatch(of: /(?i)cAfÉ/)      // "Café"
+str.firstMatch(of: /CAFÉ/)               // nil
+str.firstMatch(of: /(?i)CAFÉ/)           // "Café"
+str.firstMatch(of: /cAfÉ/.ignoresCase()) // "Café"
 ```
 
 Case insensitive matching uses case folding to ensure that canonical equivalence continues to operate as expected.
 
 **Regex syntax:** `(?i)...` or `(?i:...)`
 
-**`RegexBuilder` API:**
+**Standard Library API:**
 
 ```swift
 extension RegexComponent {
@@ -238,21 +238,26 @@ extension RegexComponent {
 
 With one or more of these options enabled, the default character classes match only ASCII values instead of the full Unicode range of characters. Four options are included in this group:
 
-* `D`: Match only ASCII members for `\d`, `\p{Digit}`, `\p{HexDigit}`, `[:digit:]`, and `CharacterClass.digit`.
-* `S`: Match only ASCII members for `\s`, `\p{Space}`, `[:space:]`, and any of the whitespace-representing `CharacterClass` members.
-* `W`: Match only ASCII members for `\w`, `\p{Word}`, `[:word:]`, and `CharacterClass.word`. Also only considers ASCII characters for `\b`, `\B`, and `Anchor.wordBoundary`.
-* `P`: Match only ASCII members for all POSIX properties (including `digit`, `space`, and `word`).
+* Regex syntax `(?D)`: Match only ASCII members for `\d`, `[:digit:]`, and `CharacterClass.digit`.
+* Regex syntax `(?S)`: Match only ASCII members for `\s`, `[:space:]`, and any of the whitespace-representing `CharacterClass` members.
+* Regex syntax `(?W)`: Match only ASCII members for `\w`, `[:word:]`, and `CharacterClass.word`. Also only considers ASCII characters for `\b`, `\B`, and `Anchor.wordBoundary`.
+* Regex syntax `(?D)`: Match only ASCII members for all POSIX properties (including `digit`, `space`, and `word`).
 
 This option affects the built-in character classes listed in the "Character Classes" section below. When one or more of these options is enabled, the set of characters matched by those character classes is constrained to the ASCII character set. For example, `CharacterClass.hexDigit` usually matches `0...9`, `a-f`, and `A-F`, in either the ASCII or half-width variants. When the `(?D)` or `.asciiOnlyClasses(.digit)` options are enabled, only the ASCII characters are matched.
 
+```swift
+let str = "0x35AB"
+str.contains(/0x(\d+)/)
+```
+
 **Regex syntax:** `(?DSWP)...` or `(?DSWP...)`
 
-**`RegexBuilder` API:**
+**Standard Library API:**
 
 ```swift
 extension RegexComponent {
-  /// Returns a regular expression that only matches ASCII characters as digits.
-  public func asciiOnlyClasses(_ kinds: RegexCharacterClassKind = .all) -> Regex<RegexOutput>
+    /// Returns a regular expression that only matches ASCII characters as digits.
+    public func asciiOnlyClasses(_ kinds: RegexCharacterClassKind = .all) -> Regex<RegexOutput>
 }
 
 /// A built-in regex character class kind.
@@ -261,24 +266,24 @@ extension RegexComponent {
 /// to control whether character classes match any character or only members
 /// of the ASCII character set.
 public struct RegexCharacterClassKind: OptionSet, Hashable {
-  public var rawValue: Int { get }
-
-  /// Regex digit-matching character classes, like `\d`, `[:digit:]`, and
-  /// `\p{HexDigit}`.
-  public static var digit: RegexCharacterClassKind { get }
-
-  /// Regex whitespace-matching character classes, like `\s`, `[:space:]`,
-  /// and `\p{Whitespace}`.
-  public static var whitespace: RegexCharacterClassKind { get }
-
-  /// Regex word character-matching character classes, like `\w`.
-  public static var wordCharacter: RegexCharacterClassKind { get }
-
-  /// All built-in regex character classes.
-  public static var all: RegexCharacterClassKind { get }
-
-  /// No built-in regex character classes.
-  public static var none: RegexCharacterClassKind { get }
+    public var rawValue: Int { get }
+  
+    /// Regex digit-matching character classes, like `\d`, `[:digit:]`, and
+    /// `\p{HexDigit}`.
+    public static var digit: RegexCharacterClassKind { get }
+  
+    /// Regex whitespace-matching character classes, like `\s`, `[:space:]`,
+    /// and `\p{Whitespace}`.
+    public static var whitespace: RegexCharacterClassKind { get }
+  
+    /// Regex word character-matching character classes, like `\w`.
+    public static var wordCharacter: RegexCharacterClassKind { get }
+  
+    /// All built-in regex character classes.
+    public static var all: RegexCharacterClassKind { get }
+  
+    /// No built-in regex character classes.
+    public static var none: RegexCharacterClassKind { get }
 }
 ```
 
